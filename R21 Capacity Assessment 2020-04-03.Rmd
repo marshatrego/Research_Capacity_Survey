@@ -1,0 +1,787 @@
+---
+title: "R21 Capacity Assessment"
+author: "Marsha Trego"
+date: "11/21/2019"
+output:
+  html_document:
+    toc: TRUE
+    toc_float:
+      collapsed: TRUE
+      smooth_scroll: TRUE
+    depth: 3
+    theme: spacelab
+    highlight: breezedark
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(psych)
+library(ggplot2)
+library(GGally)
+library(Hmisc)
+#Load naniar library. See this [page](https://cran.r-project.org/web/packages/naniar/vignettes/replace-with-na.html) for more info.
+library(naniar)
+library(dplyr)
+library(tidyverse)
+library(RColorBrewer)
+library(forcats)
+```
+
+# Data Preparation
+
+```{r include=FALSE, eval = TRUE, message = FALSE}
+#Clear existing data and graphics. See https://stackoverflow.com/questions/43672774/what-is-the-difference-between-rm-and-rmlist-ls/49518037
+#rm() means "R memory". Setting it to list lists a bunch of objects, and ls specifies all of the objects in the current workspace.
+rm(list=ls()) 
+graphics.off()
+getwd()
+setwd("C:/Users/Marsha/Documents/Biomedical Informatics/BMIN503/")
+#Read Data
+data <- read.csv('R21CapacityAssessmen_DATA_2019-09-05_1031.csv')
+```
+
+## Relabeling demographic factors
+
+* Some of the values of the demographic factors are numbers, so relabeled all of the demographic items so that sixes would not be made NA before the next step. 
+
+```{r eval = TRUE, message = FALSE}
+#c() means combine, creates a vector
+data <- mutate(data, position = factor(position, levels = c(1,2,3,4,5,6), labels = c("specialty resident","subspecialty resident","head of department","head of service","head of academic area","other")))
+
+data <- mutate(data, position2 = factor(position, levels = c("specialty resident","subspecialty resident","head of department","head of service","head of academic area","other"), labels = c("resident", "resident", "dept head", "dept head", "dept head", "resident")))
+
+data <- mutate(data, department_head = factor(department_head, levels = c(1,2,3,4,5,6,7,8,9,10,11), labels = c("internal medicine","obgyn","general surgery","anesthesia","trauma","radiology","ophthalmology","subspecialty","other","pathology","pediatrics")))
+data <- mutate(data, residence_program = factor(residence_program, levels = c(1,2,3,4,5,6,7,8,9,10,11), labels = c("internal medicine","obgyn","general surgery","anesthesia","trauma","radiology","ophthalmology","subspecialty","other","pathology","pediatrics")))
+data <- mutate(data, university = factor(university, levels = c(1,2,3,4,5), labels = c("USAC","URL","UFM","UMG","Other")))
+data <- mutate(data, gender = factor(gender, levels = c(1,2), labels = c("male","female")))
+data <- mutate(data, degree = factor(degree, levels = c(1,2,3), labels = c("1. university","2. masters or med specialty","3. 2nd masters or med subspecialty")))
+data <- mutate(data, residence_year = factor(residence_year, levels = c(1, 2, 3, 4, 5, "Fifth year", "first year", "First year", "first year ", "firts year", "fourth year", "fourth year ", "N/A", "nA", "second yeaar", "second year", "second year ", "third year", "third year "), labels = c("first year", "second year", "third year", "fourth year", "fifth year", "fifth year", "first year", "first year", "first year", "first year", "fourth year", "fourth year", "NA", "NA", "second year", "second year", "second year", "third year", "third year")))
+write.table(data, "r21cleandata1.csv", col.names=TRUE, sep=",", append=TRUE)
+
+data2 <- read.csv('r21cleandata3.csv') #it was complicated to do it in r so i made a new column in excel combining department for department heads and department for residents into one single department variable. I then imported this as a new dataframe called data2, then joined data2 to data by record_id. Now data has a column called department that is a combination of departments for heads and residents and other positions.
+data <- inner_join(by = "record_id", data, data2)
+head(data)
+table(data$department)
+```
+
+## Demographic summary stats
+
+```{r, eval=TRUE, message = FALSE}
+summary(data$age)
+df1 <- table(data$position)
+df2.2 <- "position other"
+df2 <- table(data$position_other)
+df3.3 <- "department head"
+df3 <- table(data$department_head)
+df4.4 <- "department other"
+df4 <- table(data$department_other)
+df5.5 <- "residence program"
+df5 <- table(data$residence_program)
+df6.6 <- "residence program other"
+df6 <- table(data$residence_program_other)
+df7.7 <- "residence year"
+df7 <- table(data$residence_year)
+df8.8 <- "university"
+df8 <- table(data$university)
+df9.9 <- "gender"
+df9 <- table(data$gender)
+df10.1 <- "degree"
+df10 <- table(data$degree)
+
+df1
+df2.2
+df2
+df3.3
+df3
+df4.4
+df4 
+df5.5 
+df5 
+df6.6 
+df6 
+df7.7 
+df7 
+df8.8 
+df8 
+df9.9 
+df9 
+df10.1 
+df10 
+```
+
+## Relable Missing
+
+* Making a new dataset with all "6" changed to "NA"
+* First tried using the replace_with_na method from the naniar library
+* That method did not work - 6s were not changed
+* Then switched to using na_if method from dplyR
+* This method worked but it changed every 6. 
+* When doing analysis of the final section (scale from 1-7), will need to reload dataset to analyse separately since all 6s will be NAs and it is a separate instrument (Hennessy)
+
+```{r eval = TRUE, message = FALSE}
+#making all the 6s NA before subtracting so that I don't have 0s where there should be 6s
+dataclean <- data %>% dplyr::na_if(6)
+```
+
+## Reverse Coding Variables
+
+* The following variables (knowledge, specialty_training, professor_experience, research_incentives) must be recoded because they are "backwards" (i.e. 5 is "worse" than 1)
+* Subtracting these variables from 6, so that a 5 becomes a 1, 4 becomes a 2, 3 is 3, 2 is 4, and 1 is 5
+* Thus, if the response was 5 to "Need more research knowledge in their specialty area" this is coded as 1, meaning "I currently have very little research knowledge in this area."
+* The step before should have made all 6s NA, yet when I look at a table of one of these reverse coded variables after subtracting from 6, there are 0s, but all of the 0s (the 6s) should be NAs. Although I don't know why this is happening, I applied na_if(0) to the data to fix this. There shouldn't be any other 0s in the data to be concerned about. 
+* There are now 1,991 NA missing values in the data
+
+```{r eval = TRUE, message = FALSE}
+table(dataclean$knowledge)
+dataclean$knowledge <- 6-data$knowledge
+dataclean$specialty_training <- 6-data$specialty_training
+dataclean$professor_experience <- 6-data$professor_experience
+dataclean$research_incentives <- 6-data$research_incentives
+
+dataclean <- dataclean %>% dplyr::na_if(0)
+#for these ones, zero will be the new "NA"
+
+table(is.na(dataclean))
+table(is.na(data))
+table(dataclean$department)
+```
+
+```{r eval=TRUE, message=FALSE}
+
+## Dataclean3 has values and averages for the nine component elements of systematic capacity building
+dataclean3 <- transmute(dataclean, record_id, age, position, position2 = factor(data$position, levels = c("specialty resident","subspecialty resident","head of department","head of service","head of academic area","other"), labels = c("resident", "resident", "dept head", "dept head", "dept head", "resident")), department, department_head, residence_program, department, residence_year, university, gender, degree, 
+                        research_tools, funding, collab_support, consumables, internet, journal_access, 
+                        avgPerformanceCap1 = ((research_tools + funding + collab_support + consumables + internet +journal_access)/6), 
+                        
+                         avgPerformanceCap = rowMeans(dataclean[,14:19], na.rm=TRUE), dataclean$specialty_training, dataclean$knowledge, dataclean$professor_experience, dataclean$research_incentives, dataclean$skills_training, dataclean$managerial_training, 
+                        
+                        avgPersonalCap1 = ((dataclean$specialty_training + dataclean$knowledge + dataclean$professor_experience + dataclean$research_incentives + dataclean$skills_training + dataclean$managerial_training)/6), 
+                        
+                        avgPersonalCap = rowMeans(dataclean[,20:25], na.rm=TRUE),dataclean$workload, dataclean$work_hours,
+                        
+                        avgWorkloadCap1 = ((dataclean$workload + dataclean$work_hours)/2), dataclean$monitoring, dataclean$reporting, dataclean$oversight, dataclean$excel_incentives, dataclean$sanctions, dataclean$incentive_additional,
+                        
+                        avgWorkloadCap = rowMeans(dataclean[,26:27], na.rm=TRUE),
+                        
+                        
+                        avgSupervisorCap1 = ((dataclean$monitoring + dataclean$reporting + dataclean$oversight + dataclean$excel_incentives + dataclean$sanctions + dataclean$incentive_additional)/6), 
+                        
+                        avgSupervisorCap = rowMeans(dataclean[,29:34], na.rm=TRUE),dataclean$infrastructure, dataclean$staff_support,
+                        
+                        
+                        avgFacilityCap1 = ((dataclean$infrastructure + dataclean$staff_support)/2), dataclean$consulting_firms, dataclean$training_workshops, dataclean$academic_institutions, dataclean$public_institutions,
+                        
+                        avgFacilityCap = rowMeans(dataclean[,36:37], na.rm=TRUE),
+                        
+                        
+                        avgSupportCap1 = ((dataclean$consulting_firms + dataclean$training_workshops + dataclean$academic_institutions + dataclean$public_institutions)/4), dataclean$information_flow, dataclean$admin_decisions, dataclean$research_exchange, dataclean$travel_auth, dataclean$irb_revision,
+                        
+                        avgSupportCap = rowMeans(dataclean[,38:41], na.rm=TRUE),
+                        
+                        
+                        avgSystemsCap1 = ((dataclean$information_flow + dataclean$admin_decisions + dataclean$research_exchange + dataclean$travel_auth + dataclean$irb_revision)/5), dataclean$forums, dataclean$research_importance, dataclean$curriculum, dataclean$abroad_training,
+                        
+                        avgSystemsCap = rowMeans(dataclean[,44:48], na.rm=TRUE),
+                        
+                        
+                        avgStructuralCap1 = ((dataclean$forums + dataclean$research_importance + dataclean$curriculum + dataclean$abroad_training)/4), dataclean$research_proposal, dataclean$research_choice, dataclean$research_control,
+                        
+                        avgStructuralCap = rowMeans(dataclean[,50:53], na.rm=TRUE),
+                        
+                        avgRoleCap1 = ((dataclean$research_proposal + dataclean$research_choice + dataclean$research_control)/3 ),
+                        
+                        avgRoleCap = rowMeans(dataclean[,54:56], na.rm=TRUE),
+                        
+                        avgTotalCap1 = (dataclean$research_tools + 
+                                          dataclean$funding + 
+                                          dataclean$collab_support + 
+                                          dataclean$consumables + 
+                                          dataclean$internet +
+                                          dataclean$journal_access +
+                                          dataclean$specialty_training + 
+                                          dataclean$knowledge +
+                                          dataclean$professor_experience + 
+                                          dataclean$research_incentives + 
+   dataclean$skills_training + 
+   dataclean$managerial_training+
+   dataclean$workload + 
+   dataclean$work_hours+
+   dataclean$monitoring + 
+   dataclean$reporting + 
+   dataclean$oversight + 
+   dataclean$excel_incentives + 
+   dataclean$sanctions +
+   dataclean$incentive_additional+
+   dataclean$infrastructure + 
+   dataclean$staff_support+
+   dataclean$consulting_firms + 
+   dataclean$training_workshops + 
+   dataclean$academic_institutions + 
+   dataclean$public_institutions+
+   dataclean$information_flow + 
+   dataclean$admin_decisions + 
+   dataclean$research_exchange + 
+   dataclean$travel_auth + 
+   dataclean$irb_revision+
+   dataclean$forums + 
+   dataclean$research_importance + 
+   dataclean$curriculum + 
+   dataclean$abroad_training+
+   dataclean$research_proposal + 
+   dataclean$research_choice + 
+   dataclean$research_control)/38)
+
+avgTotal <- transmute(dataclean, 
+                      dataclean$research_tools, 
+                      dataclean$funding, 
+                      dataclean$collab_support, 
+                      dataclean$consumables, 
+                      dataclean$internet, 
+                      dataclean$journal_access,
+                      dataclean$specialty_training, 
+                      dataclean$knowledge, 
+                      dataclean$professor_experience, 
+                      dataclean$research_incentives, 
+                      
+                      dataclean$skills_training, 
+                      dataclean$managerial_training,
+                      dataclean$workload, 
+                      dataclean$work_hours,
+                      dataclean$monitoring, 
+                      dataclean$reporting, 
+                      dataclean$oversight, 
+                      dataclean$excel_incentives, 
+                      dataclean$sanctions, 
+                      dataclean$incentive_additional,
+                      
+                      dataclean$infrastructure, 
+                      dataclean$staff_support,
+                      dataclean$consulting_firms, 
+                      dataclean$training_workshops, 
+                      dataclean$academic_institutions, 
+                      dataclean$public_institutions,
+                      dataclean$information_flow, 
+                      dataclean$admin_decisions, 
+                      dataclean$research_exchange, 
+                      dataclean$travel_auth, 
+                      
+                      dataclean$irb_revision,
+                      dataclean$forums, 
+                      dataclean$research_importance, 
+                      dataclean$curriculum, 
+                      dataclean$abroad_training,
+                      dataclean$research_proposal, 
+                      dataclean$research_choice, 
+                      dataclean$research_control)
+
+
+
+avgTotalCap <- rowMeans(avgTotal, na.rm=TRUE)
+mean(avgTotalCap, na.rm=TRUE)
+
+dataclean3 <- cbind(dataclean3, avgTotalCap)
+
+
+mean(dataclean3$avgTotalCap, na.rm=TRUE)
+mean(dataclean3$avgRoleCap, na.rm=TRUE)
+mean(dataclean3$avgSupervisorCap, na.rm=TRUE)
+mean(dataclean3$avgSupportCap, na.rm=TRUE)
+mean(dataclean3$avgSystemsCap, na.rm=TRUE)
+mean(dataclean3$avgPersonalCap, na.rm=TRUE)
+mean(dataclean3$avgStructuralCap, na.rm=TRUE)
+mean(dataclean3$avgPerformanceCap, na.rm=TRUE)
+mean(dataclean3$avgFacilityCap, na.rm=TRUE)
+mean(dataclean3$avgWorkloadCap, na.rm=TRUE)
+
+
+table(dataclean3$department)
+```
+
+### Dividing section A into larger subgroups
+## Tools (performance capacity), Skills (personal capacity), Staff and Infrastructure (Workload capacity with supervisory capacity and facility capacity with support service capacity), and Structures, Systems, and Roles (Structural capacity, systems capacity, and role capacity)
+
+```{r, eval = TRUE, message = FALSE}
+#performance - variables (6)/mean
+########## tools
+#personal - variables (6)/mean/tier group
+########## skills
+#workload - variables (2)/mean
+#supervisory - variables (6)/mean
+#facility - variables (2)/mean
+#support service - variables (4)/mean
+########## staff and infrastructure
+#systems - variables (5)/mean
+#structural - variables (4)/mean
+#role - variables (3)/mean
+########## structures, systems, and roles
+
+dataRegroup20200404 <- transmute(dataclean, record_id, age, position, position2 = factor(data$position, levels = c("specialty resident","subspecialty resident","head of department","head of service","head of academic area","other"), labels = c("resident", "resident", "dept head", "dept head", "dept head", "resident")), department, department_head, residence_program, residence_year, university, gender, degree, 
+                        research_tools, funding, collab_support, consumables, internet, journal_access,
+                        avgPerformanceCap = rowMeans(dataclean[,14:19], na.rm=TRUE), 
+                        avgTools = rowMeans(dataclean[,14:19], na.rm=TRUE),
+                        specialty_training, knowledge, professor_experience, research_incentives, skills_training, managerial_training, 
+                        avgPersonalCap = rowMeans(dataclean[,20:25], na.rm=TRUE),
+                        avgSkills = rowMeans(dataclean[,20:25], na.rm=TRUE),
+                        workload, work_hours, 
+                        avgWorkloadCap = rowMeans(dataclean[,26:27], na.rm=TRUE),
+                        monitoring, reporting, oversight, excel_incentives, sanctions, incentive_additional,
+                        avgSupervisorCap = rowMeans(dataclean[,29:34], na.rm=TRUE),
+                        infrastructure, staff_support,
+                        avgFacilityCap = rowMeans(dataclean[,36:37], na.rm=TRUE),
+                        consulting_firms, training_workshops, academic_institutions, public_institutions,
+                        avgSupportCap = rowMeans(dataclean[,38:41], na.rm=TRUE),
+                        avgStaffInfrastructure = (avgWorkloadCap+avgSupervisorCap+avgFacilityCap+avgSupportCap)/4,
+                        information_flow, admin_decisions, research_exchange, travel_auth, irb_revision,
+                        avgSystemsCap = rowMeans(dataclean[,44:48], na.rm=TRUE),
+                        forums, research_importance, curriculum, abroad_training,
+                        avgStructuralCap = rowMeans(dataclean[,50:53], na.rm=TRUE),
+                        research_proposal, research_choice, research_control,
+                        avgRoleCap = rowMeans(dataclean[,54:56], na.rm=TRUE),
+                        avgStructuresSystems = (avgSystemsCap+avgStructuralCap+avgRoleCap)/3)
+dataRegroup20200404<- cbind(dataRegroup20200404, avgTotalCap)
+
+#calculating means of new subgroups (skills, tools, staff/infrastructure, structures/systems/roles)
+mean(dataRegroup20200404$avgTotalCap, na.rm=TRUE)
+mean(dataRegroup20200404$avgTools, na.rm=TRUE)
+mean(dataRegroup20200404$avgSkills, na.rm=TRUE)
+mean(dataRegroup20200404$avgStaffInfrastructure, na.rm=TRUE)
+mean(dataRegroup20200404$avgStructuresSystems, na.rm=TRUE)
+
+#cronbach's alpha for new subgroups
+toolsAlpha <- transmute(dataRegroup20200404, research_tools, funding, collab_support, consumables, internet, journal_access)
+skillsAlpha <- transmute(dataRegroup20200404, specialty_training, knowledge, professor_experience, research_incentives, skills_training, managerial_training)
+staffInfrastructureAlpha <- transmute(dataRegroup20200404, workload, work_hours, monitoring, reporting, oversight, excel_incentives, sanctions, incentive_additional,infrastructure, staff_support,consulting_firms, training_workshops, academic_institutions, public_institutions)
+structuresSystemsAlpha <- transmute(dataRegroup20200404, information_flow, admin_decisions, research_exchange, travel_auth, irb_revision,forums, research_importance, curriculum, abroad_training,research_proposal, research_choice, research_control)
+
+alpha(toolsAlpha, check.keys = TRUE)
+alpha(skillsAlpha, check.keys = TRUE)
+alpha(staffInfrastructureAlpha, check.keys = TRUE)
+alpha(structuresSystemsAlpha, check.keys = TRUE)
+```
+
+### Counting Missing 
+
+* Missing from the Potter set (Section A), excluding the Hennessy set (Section B)
+
+```{r, eval=TRUE, message = FALSE}
+#dataclean9 = only the potter items, excluding open ended and hennessy and demographics
+dataclean9 <- transmute(data, data$record_id, data$date, 
+                        data$research_tools, 
+                        data$funding, 
+                        data$collab_support, 
+                        data$consumables, 
+                        data$internet, 
+                        data$journal_access, 
+                        data$specialty_training, 
+                        data$knowledge, 
+                        data$professor_experience, 
+                        data$research_incentives, 
+                        data$skills_training, 
+                        data$managerial_training, 
+                        data$workload, 
+                        data$work_hours, 
+                        data$monitoring, 
+                        data$reporting, 
+                        data$oversight, 
+                        data$excel_incentives, 
+                        data$sanctions, 
+                        data$incentive_additional, 
+                        data$infrastructure, 
+                        data$staff_support, 
+                        data$consulting_firms, 
+                        data$training_workshops, 
+                        data$academic_institutions, 
+                        data$public_institutions, 
+                        data$information_flow, 
+                        data$admin_decisions, 
+                        data$research_exchange, 
+                        data$travel_auth, 
+                        data$irb_revision, 
+                        data$forums, 
+                        data$research_importance, 
+                        data$curriculum,
+                        data$abroad_training, 
+                        data$research_proposal, 
+                        data$research_choice, 
+                        data$research_control)
+dataclean9 <- dataclean9 %>% dplyr::na_if(6)
+dataclean9$knowledge <- 6-data$knowledge
+dataclean9$specialty_training <- 6-data$specialty_training
+dataclean9$professor_experience <- 6-data$professor_experience
+dataclean9$research_incentives <- 6-data$research_incentives
+dataclean9 <- dataclean9 %>% dplyr::na_if(0)
+
+table(is.na(dataclean9))
+
+#345 missing values from potter section (2.6%)
+```
+
+# Section A (Potter and Brough)
+
+## Bar Graph
+
+```{r, eval=TRUE, message = FALSE}
+
+aPerformanceCap <- mean(dataclean3$avgPerformanceCap, na.rm=TRUE)
+bPersonalCap <- mean(dataclean3$avgPersonalCap, na.rm=TRUE)
+cWorkloadCap <- mean(dataclean3$avgWorkloadCap, na.rm=TRUE)
+dSupervisorCap <- mean(dataclean3$avgSupervisorCap, na.rm=TRUE)
+eFacilityCap <- mean(dataclean3$avgFacilityCap, na.rm=TRUE)
+fSupportCap <- mean(dataclean3$avgSupportCap, na.rm=TRUE)
+gSystemsCap <- mean(dataclean3$avgSystemsCap, na.rm=TRUE)
+hStructuralCap <- mean(dataclean3$avgStructuralCap, na.rm=TRUE)
+iRoleCap <- mean(dataclean3$avgRoleCap, na.rm=TRUE)
+jTotalCap <- mean(dataclean3$avgTotalCap, na.rm=TRUE)
+
+
+capMeans <- data.frame(aPerformanceCap, bPersonalCap, cWorkloadCap, dSupervisorCap, eFacilityCap, fSupportCap, gSystemsCap, hStructuralCap, iRoleCap, jTotalCap)
+capMeans <- data.frame(t(capMeans))
+
+capMeans <- capMeans %>% mutate(c("aPerformanceCap", "bPersonalCap", "cWorkloadCap", "dSupervisorCap", "eFacilityCap", "fSupportCap", "gSystemsCap", "hStructuralCap", "iRoleCap", "jTotalCap"))
+names(capMeans) <- c("item_average", "name")
+
+#sorting capacity means
+#capMeans <- capMeans[order(capMeans$item_average),]
+capMeans <- round(capMeans$item_average, digits = 2)
+
+class(capMeans)
+capMeans <- data.frame(capMeans)
+
+#this part is repeated because when I rounded the item_average it changed it from dataframe to numeric, but it needs to be in dataframe format. I can't only put this part after because I want to use the column names. This is not great, but it's fine for now. 
+capMeans <- capMeans %>% mutate(c("aPerformanceCap", "bPersonalCap", "cWorkloadCap", "dSupervisorCap", "eFacilityCap", "fSupportCap", "gSystemsCap", "hStructuralCap", "iRoleCap", "jTotalCap"))
+names(capMeans) <- c("item_average", "name")
+
+
+
+ggplot(data = capMeans, aes(x = name, y = item_average, fill = item_average)) + 
+  geom_bar(stat = "identity", fill = "darkgray") + 
+  geom_text(aes(label=item_average), position=position_dodge(width=0.9), vjust=-0.25) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") + 
+  scale_y_continuous("Average Rating on 1-5 scale") + 
+  xlab("Elements of systematic capacity building") +
+  #scale_x_continuous("Elements of Systematic Capacity Building") +
+  ggtitle("Average Ratings of Systematic Research Capacity") +
+  coord_cartesian(ylim=c(1,5)) +
+  scale_x_discrete(limits = c("aPerformanceCap", "bPersonalCap", "cWorkloadCap", "dSupervisorCap", "eFacilityCap", "fSupportCap", "gSystemsCap", "hStructuralCap", "iRoleCap", "jTotalCap"), 
+                   labels = c("Performance\nCapacity", "Personal\nCapacity", "Workload\nCapacity", "Supervisor\nCapacity", "Facility\nCapacity", "Support\nCapacity", "Systems\nCapacity", "Structural\nCapacity","Role\nCapacity", "Total\nCapacity"))
+
+
+```
+
+
+## Averages by position and Department - Section A
+
+```{r eval = TRUE, message = FALSE}
+#Differences by position
+avgResident1 <- filter(dataclean3, position2=="resident")
+avgHead1 <- filter(dataclean3, position2=="dept head")
+print("total, total, resident, head")
+summary(aov(dataclean3$avgTotalCap ~ dataclean3$position2))
+table(dataclean3$position2)
+mean(dataclean3$avgTotalCap, na.rm=TRUE)
+mean(avgResident1$avgTotalCap, na.rm=TRUE)
+mean(avgHead1$avgTotalCap, na.rm=TRUE)
+
+#Differences by Gender
+avgFemale1 <- filter(dataclean3, gender=="female")
+avgMale1 <- filter(dataclean3, gender=="male")
+print("gender")
+print("total, total, female, male")
+summary(aov(dataclean3$avgTotalCap ~ dataclean3$gender))
+table(dataclean3$gender)
+mean(dataclean3$avgTotalCap, na.rm=TRUE)
+mean(avgFemale1$avgTotalCap, na.rm=TRUE)
+mean(avgMale1$avgTotalCap, na.rm=TRUE)
+
+#Differences by Degree
+avgUniversity <- filter(dataclean3, degree=="1. university")
+avgMasters <- filter(dataclean3, degree=="2. masters or med specialty")
+avgMasters2 <- filter(dataclean3, degree=="3. 2nd masters or med subspecialty")
+print("degree")
+print("total, university, master, master2")
+summary(aov(dataclean3$avgTotalCap ~ dataclean3$degree))
+table(dataclean3$degree)
+mean(dataclean3$avgTotalCap, na.rm=TRUE)
+mean(avgUniversity$avgTotalCap, na.rm=TRUE)
+mean(avgMasters$avgTotalCap, na.rm=TRUE)
+mean(avgMasters2$avgTotalCap, na.rm=TRUE)
+
+#Differences by Department
+avgAnesthesia <- filter(dataclean3, department=="anesthesia")
+avgPediatrics <- filter(dataclean3, department=="pediatrics")
+avgSurgery <- filter(dataclean3, department=="general surgery")
+avgInternal <- filter(dataclean3, department=="internal medicine")
+avgTrauma <- filter(dataclean3, department=="trauma")
+avgObgyn <- filter(dataclean3, department=="obgyn")
+avgRadiology <- filter(dataclean3, department=="radiology")
+avgPathology <- filter(dataclean3, department=="pathology")
+#Grouping the three departments with <10 into one
+avgOther <- filter(dataclean3, department=="other")
+
+table(dataclean3$department)
+
+print("total department")
+summary(aov(dataclean3$avgTotalCap ~ dataclean3$department))
+print("total")
+mean(dataclean3$avgTotalCap, na.rm=TRUE)
+print("other")
+mean(avgOther$avgTotalCap, na.rm=TRUE)
+print("anesthesia")
+mean(avgAnesthesia$avgTotalCap, na.rm=TRUE)
+print("surgery")
+mean(avgSurgery$avgTotalCap, na.rm=TRUE)
+print("internal")
+mean(avgInternal$avgTotalCap, na.rm=TRUE)
+print("radiology")
+mean(avgRadiology$avgTotalCap, na.rm=TRUE)
+print("Trauma")
+mean(avgTrauma$avgTotalCap, na.rm=TRUE)
+print("pathology")
+mean(avgPathology$avgTotalCap, na.rm=TRUE)
+print("pediatric")
+mean(avgPediatrics$avgTotalCap, na.rm=TRUE)
+print("obgyn")
+mean(avgObgyn$avgTotalCap, na.rm=TRUE)
+
+
+#Post hoc test to compare internal medicine (n=64) to other departments
+
+pairwise.t.test(dataclean3$avgTotalCap, dataclean3$department, p.adj = "none")
+pairwise.t.test(dataclean3$avgTotalCap, dataclean3$department, p.adj = "bonf")
+table(dataclean3$department)
+```
+
+## Cronbach's Alpha
+
+> Cronbach's alpha for the entire section is 0.92 (95CI = .91,.93).
+
+```{r, eval=TRUE, message = FALSE}
+performanceAlpha <- transmute(dataclean, research_tools, funding, collab_support, consumables, internet, journal_access)
+alpha(performanceAlpha)
+
+personalApha <- transmute(dataclean, specialty_training, knowledge, professor_experience, research_incentives, skills_training, managerial_training)
+alpha(personalApha, check.keys=TRUE)
+#for personal capacity, items were reversed coded manually in the dataframe dataclean. Check.keys was left on here, but it did a better job when i did it manually than when i let it detect and code. 
+
+workloadApha <- transmute(dataclean, workload, work_hours)
+alpha(workloadApha, check.keys=TRUE)
+
+supervisorAlpha <- transmute(dataclean, monitoring, reporting, oversight, excel_incentives, sanctions, incentive_additional)
+alpha(supervisorAlpha, check.keys = TRUE)
+
+facilityAlpha <- transmute(dataclean, infrastructure, staff_support)
+alpha(facilityAlpha, check.keys = TRUE)
+
+supportAlpha <- transmute(dataclean, consulting_firms, training_workshops, academic_institutions, public_institutions)
+alpha(supportAlpha, check.keys = TRUE)
+
+systemsAlpha <- transmute(dataclean, information_flow, admin_decisions, research_exchange, travel_auth, irb_revision)
+alpha(systemsAlpha, check.keys = TRUE)
+
+structuralAlpha <- transmute(dataclean, forums, research_importance, curriculum, abroad_training)
+alpha(structuralAlpha, check.keys = TRUE)
+
+roleAlpha <- transmute(dataclean, research_proposal, research_choice, research_control)
+alpha(roleAlpha, check.keys = TRUE)
+
+totalAlpha <- transmute(dataclean, research_tools, funding, collab_support, consumables, internet, journal_access, specialty_training, knowledge, professor_experience, research_incentives, skills_training, managerial_training, workload, work_hours, monitoring, reporting, oversight, excel_incentives, sanctions, incentive_additional, infrastructure, staff_support, consulting_firms, training_workshops, academic_institutions, public_institutions, information_flow, admin_decisions, research_exchange, travel_auth, irb_revision, forums, research_importance, curriculum, abroad_training, research_proposal, research_choice, research_control)
+alpha(totalAlpha, check.keys = TRUE)
+```
+
+# Section B (Henessy-Hicks)
+
+```{r, eval=TRUE, message = FALSE}
+#first making a new dataframe with just demographics and the hennessy data, separate from potter data because if different cleaning methods (e.g., 6 = na in potter but not in hennessy)
+#also making new columns for averages
+#grouped "other position" with "resident" in position2 because there are only 7 so too few for analysis as group and there was mixed education level and age
+clean4 <- transmute(data, record_id, age, position, position2 = factor(data$position, levels = c("specialty resident","subspecialty resident","head of department","head of service","head of academic area","other"), labels = c("resident", "resident", "dept head", "dept head", "dept head", "resident")), department_head, residence_program, department, residence_year, university, gender, degree, evaluating, topics, design, information_collection, new_ideas,
+                    avgResearchDesign = ((evaluating + topics + design + information_collection + new_ideas)/5), paperwork, resource_access, time_management, admin_activitives, 
+                    avgResearchManagement = ((paperwork + resource_access + time_management + admin_activitives)/4), instructing, feedback, team_member, colleague_rapport, 
+                    avgCollaborative = ((instructing + feedback+ team_member+ colleague_rapport)/4), technical_equipment, limited_resources, change_coping, health_promotion, 
+                    avgImplementation = ((technical_equipment+ limited_resources+ change_coping+ health_promotion)/4), interpret_findings, report_writing, self_appraisal, practical_application, data_analysis, 
+                    avgResults =((interpret_findings+ report_writing+ self_appraisal+ practical_application+ data_analysis)/5), 
+                    avgTotal = ((evaluating + topics + design + information_collection + new_ideas + paperwork + resource_access + time_management + admin_activitives + instructing + feedback+ team_member+ colleague_rapport + technical_equipment+ limited_resources+ change_coping+ health_promotion + interpret_findings+ report_writing+ self_appraisal+ practical_application+ data_analysis)/22))
+
+#Mean for section B total
+mean(clean4$avgTotal,na.rm=TRUE)
+```
+
+
+
+
+## Exploring differences in section averages by position (head or resident), department, gender, degree- Section B
+
+```{r eval = TRUE, message = FALSE}
+#filtering by position as resident of department head
+avgResident <- filter(clean4, position2 == "resident")
+avgHead <- filter(clean4, position2 == "dept head")
+
+#returning ANOVAS total average and each group of skills and the group means for position
+print("Average Total ANOVA")
+summary(aov(clean4$avgTotal ~ clean4$position2))
+mean(avgResident$avgTotal, na.rm=TRUE)
+mean(avgHead$avgTotal, na.rm=TRUE)
+
+##########################################################################
+
+avgAnesthesia1 <- filter(clean4, department=="anesthesia")
+avgPediatrics1 <- filter(clean4, department=="pediatrics")
+avgSurgery1 <- filter(clean4, department=="general surgery")
+avgInternal1 <- filter(clean4, department=="internal medicine")
+avgTrauma1 <- filter(clean4, department=="trauma")
+avgObgyn1 <- filter(clean4, department=="obgyn")
+avgRadiology1 <- filter(clean4, department=="radiology")
+avgPathology1 <- filter(clean4, department=="pathology")
+avgOther <- filter(clean4, department=="other")
+
+
+print("total department")
+summary(aov(clean4$avgTotal ~ clean4$department))
+mean(clean4$avgTotal, na.rm=TRUE)
+mean(avgAnesthesia1$avgTotal, na.rm=TRUE)
+mean(avgPediatrics1$avgTotal, na.rm=TRUE)
+mean(avgSurgery1$avgTotal, na.rm=TRUE)
+mean(avgInternal1$avgTotal, na.rm=TRUE)
+mean(avgTrauma1$avgTotal, na.rm=TRUE)
+mean(avgObgyn1$avgTotal, na.rm=TRUE)
+mean(avgRadiology1$avgTotal, na.rm=TRUE)
+mean(avgPathology1$avgTotal, na.rm=TRUE)
+mean(avgOther$avgTotal, na.rm=TRUE)
+
+table(dataclean3$department)
+table(clean4$department)
+
+#difference by gender
+avgFemale2 <- filter(clean4, gender=="female")
+avgMale2 <- filter(clean4, gender=="male")
+print("gender")
+anovaGender <- summary(aov(clean4$avgTotal ~ clean4$gender))
+mean(avgFemale2$avgTotal, na.rm=TRUE)
+mean(avgMale2$avgTotal, na.rm=TRUE)
+
+#difference by degree
+avgUniversity1 <- filter(clean4, degree=="1. university")
+avgMasters1 <- filter(clean4, degree=="2. masters or med specialty")
+avgMasters12 <- filter(clean4, degree=="3. 2nd masters or med subspecialty")
+summary(aov(clean4$avgTotal ~ clean4$degree))
+mean(avgUniversity1$avgTotal, na.rm=TRUE)
+mean(avgMasters1$avgTotal, na.rm=TRUE)
+mean(avgMasters12$avgTotal, na.rm=TRUE)
+
+pairwise.t.test(clean4$avgTotal, clean4$degree, p.adj = "none")
+pairwise.t.test(clean4$avgTotal, clean4$degree, p.adj = "bonf")
+
+#difference by university
+summary(aov(clean4$avgTotal ~ clean4$university))
+```
+
+## Cronbach's alpha
+
+Alpha for entire section B is 0.96.
+
+```{r, eval=TRUE, message = FALSE}
+totalAlphaPt2 <- transmute(clean4, evaluating, topics, design, information_collection, new_ideas, paperwork, resource_access, time_management, admin_activitives, instructing, feedback, team_member, colleague_rapport, technical_equipment, limited_resources, change_coping, health_promotion, interpret_findings, report_writing, self_appraisal, practical_application, data_analysis)
+alpha(totalAlphaPt2, check.keys = TRUE)
+
+
+collaborativeAlpha <- transmute(clean4, instructing, feedback, team_member, colleague_rapport)
+alpha(collaborativeAlpha)
+
+researchDesignAlpha <- transmute(clean4, evaluating, topics, design, information_collection, new_ideas)
+alpha(researchDesignAlpha)
+
+researchManagementAlpha <- transmute(clean4, paperwork, resource_access, time_management, admin_activitives)
+alpha(researchManagementAlpha)
+
+implementationAlpha <- transmute(clean4, technical_equipment, limited_resources, change_coping, health_promotion)
+alpha(implementationAlpha)
+
+resultsAlpha <- transmute(clean4, interpret_findings, report_writing, self_appraisal, practical_application, data_analysis)
+alpha(resultsAlpha)
+
+
+#######################################################################################
+
+```
+
+## Exploring correlations with demographic variables
+
+```{r, eval=TRUE, message = FALSE}
+ggplot(clean4, aes(age, avgTotal)) + geom_point() + geom_smooth(method = 'lm', se = TRUE)
+
+ggplotRegression <- function (fit) {
+  require(ggplot2)
+  ggplot(fit$model, aes_string(x = names(fit$model)[2], y = names(fit$model)[1])) + 
+  geom_point() +
+  stat_smooth(method = "lm", col = "blue") +
+  labs(title = paste("Adj R2 = ",signif(summary(fit)$adj.r.squared, 5),"Intercept =",signif(fit$coef[[1]],5 )," Slope =",signif(fit$coef[[2]], 5), " P =",signif(summary(fit)$coef[2,4], 5)))
+}
+
+fit1 <- lm(age ~ avgTotal, data = clean4)
+ggplotRegression(fit1)
+#No relationship between total average and age
+
+wilcox.test(data = clean4, avgTotal ~ gender)
+t.test(data = clean4, avgTotal ~ gender)
+#No relationship between total average and gender
+wilcox.test(data = clean4, avgTotal ~ position2)
+t.test(data = clean4, avgTotal ~ position2)
+#Small significant difference between total average and being a resident or department head
+
+kruskal.test(clean4$avgTotal, clean4$department) #did both kruskal wallis and one-way anova because wasn't sure which was more appropriate
+summary(aov(clean4$avgTotal~clean4$department))
+#No relationship between total average and department
+
+byDepartment <- group_by(clean4, department)
+byDepartment <- summarise(byDepartment, count = n(),avgByDepartment = mean(avgTotal, na.rm = TRUE))
+byDepartment
+```
+
+## Bar Graph
+
+```{r, eval=TRUE, message = FALSE}
+
+pt2Vis <- transmute(clean4, 
+                    avgResearchDesign,
+                    avgResearchManagement,
+                    avgCollaborative,
+                    avgImplementation,
+                    avgResults,
+                    avgTotal)
+
+class(pt2Vis)
+#pt2Vis <- t(pt2Vis)
+pt2Vis <- as.data.frame(pt2Vis)
+
+pt3Vis <- transmute(pt2Vis, design = (mean(pt2Vis[,1], na.rm=TRUE)), management = (mean(pt2Vis$avgResearchManagement, na.rm=TRUE)), collaborate = (mean(pt2Vis$avgCollaborative, na.rm=TRUE)), implement = (mean(pt2Vis$avgImplementation, na.rm=TRUE)), results = (mean(pt2Vis$avgResults, na.rm=TRUE)), total = (mean(pt2Vis$avgTotal, na.rm=TRUE)))
+
+design <- (mean(pt2Vis[,1], na.rm=TRUE))
+management <- (mean(pt2Vis$avgResearchManagement, na.rm=TRUE))
+collaborate <- (mean(pt2Vis$avgCollaborative, na.rm=TRUE))
+implement <- (mean(pt2Vis$avgImplementation, na.rm=TRUE))
+results <- (mean(pt2Vis$avgResults, na.rm=TRUE))
+total <- (mean(pt2Vis$avgTotal, na.rm=TRUE))
+pt3Vis <- data.frame(design, management, collaborate, implement, results, total)
+pt3Vis <- t(pt3Vis)
+pt3Vis <- round(pt3Vis[,1], digits=2)
+pt3Vis <- data.frame(pt3Vis)
+class(pt3Vis)
+pt3Vis <- pt3Vis %>% mutate(c("design", "management", "collaborate", "implement", "results", "total"))
+names(pt3Vis) <- c("item_average", "name")
+
+###########################################################################################################################
+
+ggplot(data = pt3Vis, aes(x = name, y = item_average, fill = item_average)) + 
+  geom_bar(stat = "identity", fill="darkgray") + 
+  geom_text(aes(label=item_average), position=position_dodge(width=0.9), vjust=-0.25) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") + 
+  scale_y_continuous("Average Rating on 1-7 scale") + 
+  xlab("Areas of training need") +
+  #scale_x_continuous("Elements of Systematic Capacity Building") +
+  ggtitle("Average self-reported training needs on 1-7 scale") +
+  coord_cartesian(ylim=c(1,7))
+
+###########################################################################################################################
+
+```
