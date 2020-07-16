@@ -36,9 +36,10 @@ library(forcats)
 rm(list=ls()) 
 graphics.off()
 getwd()
-setwd("C:/Users/Marsha/Documents/Biomedical Informatics/BMIN503/")
+setwd("C:/Users/Marsha/Documents/Capacity Assessment Data")
 #Read Data
 data <- read.csv('R21CapacityAssessmen_DATA_2019-09-05_1031.csv')
+getwd()
 ```
 
 ## Relabeling demographic factors
@@ -49,17 +50,33 @@ data <- read.csv('R21CapacityAssessmen_DATA_2019-09-05_1031.csv')
 #c() means combine, creates a vector
 data <- mutate(data, position = factor(position, levels = c(1,2,3,4,5,6), labels = c("specialty resident","subspecialty resident","head of department","head of service","head of academic area","other")))
 
+
 data <- mutate(data, position2 = factor(position, levels = c("specialty resident","subspecialty resident","head of department","head of service","head of academic area","other"), labels = c("resident", "resident", "dept head", "dept head", "dept head", "resident")))
 
-data <- mutate(data, department_head = factor(department_head, levels = c(1,2,3,4,5,6,7,8,9,10,11), labels = c("internal medicine","obgyn","general surgery","anesthesia","trauma","radiology","ophthalmology","subspecialty","other","pathology","pediatrics")))
-data <- mutate(data, residence_program = factor(residence_program, levels = c(1,2,3,4,5,6,7,8,9,10,11), labels = c("internal medicine","obgyn","general surgery","anesthesia","trauma","radiology","ophthalmology","subspecialty","other","pathology","pediatrics")))
-data <- mutate(data, university = factor(university, levels = c(1,2,3,4,5), labels = c("USAC","URL","UFM","UMG","Other")))
-data <- mutate(data, gender = factor(gender, levels = c(1,2), labels = c("male","female")))
-data <- mutate(data, degree = factor(degree, levels = c(1,2,3), labels = c("1. university","2. masters or med specialty","3. 2nd masters or med subspecialty")))
-data <- mutate(data, residence_year = factor(residence_year, levels = c(1, 2, 3, 4, 5, "Fifth year", "first year", "First year", "first year ", "firts year", "fourth year", "fourth year ", "N/A", "nA", "second yeaar", "second year", "second year ", "third year", "third year "), labels = c("first year", "second year", "third year", "fourth year", "fifth year", "fifth year", "first year", "first year", "first year", "first year", "fourth year", "fourth year", "NA", "NA", "second year", "second year", "second year", "third year", "third year")))
-write.table(data, "r21cleandata1.csv", col.names=TRUE, sep=",", append=TRUE)
 
+data <- mutate(data, department_head = factor(department_head, levels = c(1,2,3,4,5,6,7,8,9,10,11), labels = c("internal medicine","obgyn","general surgery","anesthesia","trauma","radiology","ophthalmology","subspecialty","other","pathology","pediatrics")))
+
+
+data <- mutate(data, residence_program = factor(residence_program, levels = c(1,2,3,4,5,6,7,8,9,10,11), labels = c("internal medicine","obgyn","general surgery","anesthesia","trauma","radiology","ophthalmology","subspecialty","other","pathology","pediatrics")))
+
+
+data <- mutate(data, university = factor(university, levels = c(1,2,3,4,5), labels = c("USAC","URL","UFM","UMG","Other")))
+
+
+data <- mutate(data, gender = factor(gender, levels = c(1,2), labels = c("male","female")))
+
+
+data <- mutate(data, degree = factor(degree, levels = c(1,2,3), labels = c("1. university","2. masters or med specialty","3. 2nd masters or med subspecialty")))
+
+
+data <- mutate(data, residence_year = factor(residence_year, levels = c(1, 2, 3, 4, 5, "Fifth year", "first year", "First year", "first year ", "firts year", "fourth year", "fourth year ", "N/A", "nA", "second yeaar", "second year", "second year ", "third year", "third year "), labels = c("first year", "second year", "third year", "fourth year", "fifth year", "fifth year", "first year", "first year", "first year", "first year", "fourth year", "fourth year", "NA", "NA", "second year", "second year", "second year", "third year", "third year")))
+
+
+
+write.table(data, "r21cleandata1.csv", col.names=TRUE, sep=",", append=TRUE)
+setwd("C:/Users/Marsha/Documents/Capacity Assessment Data")
 data2 <- read.csv('r21cleandata3.csv') #it was complicated to do it in r so i made a new column in excel combining department for department heads and department for residents into one single department variable. I then imported this as a new dataframe called data2, then joined data2 to data by record_id. Now data has a column called department that is a combination of departments for heads and residents and other positions.
+data_backup <- data
 data <- inner_join(by = "record_id", data, data2)
 head(data)
 table(data$department)
@@ -294,6 +311,8 @@ mean(dataclean3$avgPerformanceCap, na.rm=TRUE)
 mean(dataclean3$avgFacilityCap, na.rm=TRUE)
 mean(dataclean3$avgWorkloadCap, na.rm=TRUE)
 
+range(dataclean3$avgTotalCap, na.rm=TRUE)
+
 
 table(dataclean3$department)
 ```
@@ -318,25 +337,34 @@ table(dataclean3$department)
 
 dataRegroup20200404 <- transmute(dataclean, record_id, age, position, position2 = factor(data$position, levels = c("specialty resident","subspecialty resident","head of department","head of service","head of academic area","other"), labels = c("resident", "resident", "dept head", "dept head", "dept head", "resident")), department, department_head, residence_program, residence_year, university, gender, degree, 
                         research_tools, funding, collab_support, consumables, internet, journal_access,
+                        
                         avgPerformanceCap = rowMeans(dataclean[,14:19], na.rm=TRUE), 
                         avgTools = rowMeans(dataclean[,14:19], na.rm=TRUE),
                         specialty_training, knowledge, professor_experience, research_incentives, skills_training, managerial_training, 
+                        
                         avgPersonalCap = rowMeans(dataclean[,20:25], na.rm=TRUE),
                         avgSkills = rowMeans(dataclean[,20:25], na.rm=TRUE),
                         workload, work_hours, 
+                        
                         avgWorkloadCap = rowMeans(dataclean[,26:27], na.rm=TRUE),
                         monitoring, reporting, oversight, excel_incentives, sanctions, incentive_additional,
+                        
                         avgSupervisorCap = rowMeans(dataclean[,29:34], na.rm=TRUE),
                         infrastructure, staff_support,
+                        
                         avgFacilityCap = rowMeans(dataclean[,36:37], na.rm=TRUE),
                         consulting_firms, training_workshops, academic_institutions, public_institutions,
+                        
                         avgSupportCap = rowMeans(dataclean[,38:41], na.rm=TRUE),
+                        
                         avgStaffInfrastructure = (avgWorkloadCap+avgSupervisorCap+avgFacilityCap+avgSupportCap)/4,
                         information_flow, admin_decisions, research_exchange, travel_auth, irb_revision,
+                        
                         avgSystemsCap = rowMeans(dataclean[,44:48], na.rm=TRUE),
                         forums, research_importance, curriculum, abroad_training,
                         avgStructuralCap = rowMeans(dataclean[,50:53], na.rm=TRUE),
                         research_proposal, research_choice, research_control,
+                        
                         avgRoleCap = rowMeans(dataclean[,54:56], na.rm=TRUE),
                         avgStructuresSystems = (avgSystemsCap+avgStructuralCap+avgRoleCap)/3)
 dataRegroup20200404<- cbind(dataRegroup20200404, avgTotalCap)
@@ -347,6 +375,17 @@ mean(dataRegroup20200404$avgTools, na.rm=TRUE)
 mean(dataRegroup20200404$avgSkills, na.rm=TRUE)
 mean(dataRegroup20200404$avgStaffInfrastructure, na.rm=TRUE)
 mean(dataRegroup20200404$avgStructuresSystems, na.rm=TRUE)
+print("standard deviations")
+print("total")
+sd(dataRegroup20200404$avgTotalCap, na.rm=TRUE)
+print("tools")
+sd(dataRegroup20200404$avgTools, na.rm=TRUE)
+print("skills")
+sd(dataRegroup20200404$avgSkills, na.rm=TRUE)
+print("infrastructure")
+sd(dataRegroup20200404$avgStaffInfrastructure, na.rm=TRUE)
+print("structures")
+sd(dataRegroup20200404$avgStructuresSystems, na.rm=TRUE)
 
 #cronbach's alpha for new subgroups
 toolsAlpha <- transmute(dataRegroup20200404, research_tools, funding, collab_support, consumables, internet, journal_access)
@@ -482,6 +521,10 @@ table(dataclean3$position2)
 mean(dataclean3$avgTotalCap, na.rm=TRUE)
 mean(avgResident1$avgTotalCap, na.rm=TRUE)
 mean(avgHead1$avgTotalCap, na.rm=TRUE)
+print("sd resident")
+sd(avgResident1$avgTotalCap, na.rm=TRUE)
+print("sd head")
+sd(avgHead1$avgTotalCap, na.rm=TRUE)
 
 #Differences by Gender
 avgFemale1 <- filter(dataclean3, gender=="female")
@@ -491,8 +534,14 @@ print("total, total, female, male")
 summary(aov(dataclean3$avgTotalCap ~ dataclean3$gender))
 table(dataclean3$gender)
 mean(dataclean3$avgTotalCap, na.rm=TRUE)
+print("mean female")
 mean(avgFemale1$avgTotalCap, na.rm=TRUE)
+print("mean male")
 mean(avgMale1$avgTotalCap, na.rm=TRUE)
+print("sd female")
+sd(avgFemale1$avgTotalCap, na.rm=TRUE)
+print("sd male")
+sd(avgMale1$avgTotalCap, na.rm=TRUE)
 
 #Differences by Degree
 avgUniversity <- filter(dataclean3, degree=="1. university")
@@ -506,6 +555,13 @@ mean(dataclean3$avgTotalCap, na.rm=TRUE)
 mean(avgUniversity$avgTotalCap, na.rm=TRUE)
 mean(avgMasters$avgTotalCap, na.rm=TRUE)
 mean(avgMasters2$avgTotalCap, na.rm=TRUE)
+print("sd university")
+sd(avgUniversity$avgTotalCap, na.rm=TRUE)
+print("sd masters")
+sd(avgMasters$avgTotalCap, na.rm=TRUE)
+print("sd 2nd masters")
+sd(avgMasters2$avgTotalCap, na.rm=TRUE)
+
 
 #Differences by Department
 avgAnesthesia <- filter(dataclean3, department=="anesthesia")
@@ -525,24 +581,34 @@ print("total department")
 summary(aov(dataclean3$avgTotalCap ~ dataclean3$department))
 print("total")
 mean(dataclean3$avgTotalCap, na.rm=TRUE)
+sd(dataclean3$avgTotalCap, na.rm=TRUE)
 print("other")
 mean(avgOther$avgTotalCap, na.rm=TRUE)
+sd(avgOther$avgTotalCap, na.rm=TRUE)
 print("anesthesia")
 mean(avgAnesthesia$avgTotalCap, na.rm=TRUE)
+sd(avgAnesthesia$avgTotalCap, na.rm=TRUE)
 print("surgery")
 mean(avgSurgery$avgTotalCap, na.rm=TRUE)
+sd(avgSurgery$avgTotalCap, na.rm=TRUE)
 print("internal")
 mean(avgInternal$avgTotalCap, na.rm=TRUE)
+sd(avgInternal$avgTotalCap, na.rm=TRUE)
 print("radiology")
 mean(avgRadiology$avgTotalCap, na.rm=TRUE)
+sd(avgRadiology$avgTotalCap, na.rm=TRUE)
 print("Trauma")
 mean(avgTrauma$avgTotalCap, na.rm=TRUE)
+sd(avgTrauma$avgTotalCap, na.rm=TRUE)
 print("pathology")
 mean(avgPathology$avgTotalCap, na.rm=TRUE)
+sd(avgPathology$avgTotalCap, na.rm=TRUE)
 print("pediatric")
 mean(avgPediatrics$avgTotalCap, na.rm=TRUE)
+sd(avgPediatrics$avgTotalCap, na.rm=TRUE)
 print("obgyn")
 mean(avgObgyn$avgTotalCap, na.rm=TRUE)
+sd(avgObgyn$avgTotalCap, na.rm=TRUE)
 
 
 #Post hoc test to compare internal medicine (n=64) to other departments
@@ -586,6 +652,7 @@ roleAlpha <- transmute(dataclean, research_proposal, research_choice, research_c
 alpha(roleAlpha, check.keys = TRUE)
 
 totalAlpha <- transmute(dataclean, research_tools, funding, collab_support, consumables, internet, journal_access, specialty_training, knowledge, professor_experience, research_incentives, skills_training, managerial_training, workload, work_hours, monitoring, reporting, oversight, excel_incentives, sanctions, incentive_additional, infrastructure, staff_support, consulting_firms, training_workshops, academic_institutions, public_institutions, information_flow, admin_decisions, research_exchange, travel_auth, irb_revision, forums, research_importance, curriculum, abroad_training, research_proposal, research_choice, research_control)
+
 alpha(totalAlpha, check.keys = TRUE)
 ```
 
@@ -603,8 +670,27 @@ clean4 <- transmute(data, record_id, age, position, position2 = factor(data$posi
                     avgResults =((interpret_findings+ report_writing+ self_appraisal+ practical_application+ data_analysis)/5), 
                     avgTotal = ((evaluating + topics + design + information_collection + new_ideas + paperwork + resource_access + time_management + admin_activitives + instructing + feedback+ team_member+ colleague_rapport + technical_equipment+ limited_resources+ change_coping+ health_promotion + interpret_findings+ report_writing+ self_appraisal+ practical_application+ data_analysis)/22))
 
+
 #Mean for section B total
+print("total")
 mean(clean4$avgTotal,na.rm=TRUE)
+sd(clean4$avgTotal,na.rm=TRUE)
+range(clean4$avgTotal,na.rm=TRUE)
+print("colab")
+mean(clean4$avgCollaborative, na.rm=TRUE)
+sd(clean4$avgCollaborative, na.rm=TRUE)
+print("design")
+mean(clean4$avgResearchDesign, na.rm=TRUE)
+sd(clean4$avgResearchDesign, na.rm=TRUE)
+print("implement")
+mean(clean4$avgImplementation, na.rm=TRUE)
+sd(clean4$avgImplementation, na.rm=TRUE)
+print("result")
+mean(clean4$avgResults, na.rm=TRUE)
+sd(clean4$avgResults, na.rm=TRUE)
+print("manage")
+mean(clean4$avgResearchManagement, na.rm=TRUE)
+sd(clean4$avgResearchManagement, na.rm=TRUE)
 ```
 
 
@@ -616,12 +702,15 @@ mean(clean4$avgTotal,na.rm=TRUE)
 #filtering by position as resident of department head
 avgResident <- filter(clean4, position2 == "resident")
 avgHead <- filter(clean4, position2 == "dept head")
-
 #returning ANOVAS total average and each group of skills and the group means for position
 print("Average Total ANOVA")
 summary(aov(clean4$avgTotal ~ clean4$position2))
+print("mean and sd resident")
 mean(avgResident$avgTotal, na.rm=TRUE)
+sd(avgResident$avgTotal, na.rm=TRUE)
+print("mean and sd head")
 mean(avgHead$avgTotal, na.rm=TRUE)
+sd(avgHead$avgTotal, na.rm=TRUE)
 
 ##########################################################################
 
@@ -639,15 +728,33 @@ avgOther <- filter(clean4, department=="other")
 print("total department")
 summary(aov(clean4$avgTotal ~ clean4$department))
 mean(clean4$avgTotal, na.rm=TRUE)
+print("mean and sd anesthesia")
 mean(avgAnesthesia1$avgTotal, na.rm=TRUE)
+sd(avgAnesthesia1$avgTotal, na.rm=TRUE)
+print("mean and sd peds")
 mean(avgPediatrics1$avgTotal, na.rm=TRUE)
+sd(avgPediatrics1$avgTotal, na.rm=TRUE)
+print("mean and sd surgery")
 mean(avgSurgery1$avgTotal, na.rm=TRUE)
+sd(avgSurgery1$avgTotal, na.rm=TRUE)
+print("mean and sd internal")
 mean(avgInternal1$avgTotal, na.rm=TRUE)
+sd(avgInternal1$avgTotal, na.rm=TRUE)
+print("mean and sd trauma")
 mean(avgTrauma1$avgTotal, na.rm=TRUE)
+sd(avgTrauma1$avgTotal, na.rm=TRUE)
+print("mean and sd obgyn")
 mean(avgObgyn1$avgTotal, na.rm=TRUE)
+sd(avgObgyn1$avgTotal, na.rm=TRUE)
+print("mean and sd radiology")
 mean(avgRadiology1$avgTotal, na.rm=TRUE)
+sd(avgRadiology1$avgTotal, na.rm=TRUE)
+print("mean and sd pathology")
 mean(avgPathology1$avgTotal, na.rm=TRUE)
+sd(avgPathology1$avgTotal, na.rm=TRUE)
+print("mean and sd other")
 mean(avgOther$avgTotal, na.rm=TRUE)
+sd(avgOther$avgTotal, na.rm=TRUE)
 
 table(dataclean3$department)
 table(clean4$department)
@@ -659,6 +766,8 @@ print("gender")
 anovaGender <- summary(aov(clean4$avgTotal ~ clean4$gender))
 mean(avgFemale2$avgTotal, na.rm=TRUE)
 mean(avgMale2$avgTotal, na.rm=TRUE)
+sd(avgFemale2$avgTotal, na.rm=TRUE)
+sd(avgMale2$avgTotal, na.rm=TRUE)
 
 #difference by degree
 avgUniversity1 <- filter(clean4, degree=="1. university")
@@ -668,6 +777,9 @@ summary(aov(clean4$avgTotal ~ clean4$degree))
 mean(avgUniversity1$avgTotal, na.rm=TRUE)
 mean(avgMasters1$avgTotal, na.rm=TRUE)
 mean(avgMasters12$avgTotal, na.rm=TRUE)
+sd(avgUniversity1$avgTotal, na.rm=TRUE)
+sd(avgMasters1$avgTotal, na.rm=TRUE)
+sd(avgMasters12$avgTotal, na.rm=TRUE)
 
 pairwise.t.test(clean4$avgTotal, clean4$degree, p.adj = "none")
 pairwise.t.test(clean4$avgTotal, clean4$degree, p.adj = "bonf")
